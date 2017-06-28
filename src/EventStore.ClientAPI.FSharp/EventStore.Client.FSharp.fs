@@ -10,7 +10,7 @@ module AsyncHelpers =
       Async.FromContinuations(fun (_,econt,_) -> econt e)
 
   let awaitTask (t : System.Threading.Tasks.Task) =
-    let flattenExns (e : AggregateException) = e.Flatten().InnerExceptions |> Seq.nth 0
+    let flattenExns (e : AggregateException) = e.Flatten().InnerExceptions |> Seq.item 0
     let rewrapAsyncExn (it : Async<unit>) =
       async { try do! it with :? AggregateException as ae -> do! (Async.Raise <| flattenExns ae) }
     let tcs = new TaskCompletionSource<unit>(TaskCreationOptions.None)
@@ -336,7 +336,7 @@ and Connection =
   /// Subscribe from, position exclusive
   /// https://github.com/EventStore/EventStore/blob/ES-NET-v2.0.1/src/EventStore/EventStore.ClientAPI/IEventStoreConnection.cs#L383
   abstract SubscribeToAllFrom            : Position option
-                                            * ResolveLinksStrategy
+                                            * CatchUpSubscriptionSettings option
                                             // eventAppeared:
                                             * Action<EventStoreCatchUpSubscription, ResolvedEvent>
                                             // liveProcessingStarted:
@@ -362,7 +362,7 @@ and Connection =
   abstract SubscribeToStreamFrom         : StreamId
                                             * StreamCheckpoint
                                             // resolveLinks:
-                                            * ResolveLinksStrategy
+                                            * CatchUpSubscriptionSettings option
                                             // eventAppeared:
                                             * Action<EventStoreCatchUpSubscription, ResolvedEvent>
                                             // liveProcessingStarted:
@@ -386,7 +386,7 @@ module TypeExtensions =
 
   open Helpers
   open AsyncHelpers
-
+  
   type EventStore.ClientAPI.IEventStoreConnection with
     /// Convert the connection to be usable with the F# API (an interface
     /// to allow easy stubbing and mocking).
@@ -403,7 +403,7 @@ module TypeExtensions =
           member x.AppendToStream(streamId, expectedVersion, userCredentials, events) =
             match expectedVersion with
             | ExpectedVersion expectedVersion ->
-              y.AppendToStreamAsync(streamId, expectedVersion, events, userCredentials)
+              y.AppendToStreamAsync(streamId, expectedVersion |> int64, events, userCredentials)
 
           member x.ConnectionName =
             y.ConnectionName
@@ -432,7 +432,7 @@ module TypeExtensions =
           member x.DeleteStream (streamId, expectedVersion, userCredentials) =
             match expectedVersion with
             | ExpectedVersion expectedVersion ->
-              y.DeleteStreamAsync(streamId, expectedVersion, userCredentials)
+              y.DeleteStreamAsync(streamId, expectedVersion |> int64, userCredentials)
 
           member x.GetStreamMetadata (streamId, userCredentials) =
             y.GetStreamMetadataAsync(streamId, userCredentials)
@@ -455,7 +455,7 @@ module TypeExtensions =
           member x.ReadEvent(stream, eventVersion, resolveLinks, userCredentials) =
             match eventVersion with
             | EventVersion eventVersion ->
-              y.ReadEventAsync(stream, eventVersion,
+              y.ReadEventAsync(stream, eventVersion |> int64,
                                (match resolveLinks with ResolveLinks r -> r),
                                userCredentials)
 
@@ -465,7 +465,7 @@ module TypeExtensions =
                 match start with
                 | Specific i -> validUint i
                 | LastInStream -> -1
-            y.ReadStreamEventsForwardAsync(streamId, startEvent, count,
+            y.ReadStreamEventsForwardAsync(streamId, startEvent |> int64, count,
                                            (match resolveLinks with ResolveLinks r -> r),
                                            userCredentials)
 
@@ -475,19 +475,19 @@ module TypeExtensions =
                 match start with
                 | Specific i -> validUint i
                 | LastInStream -> -1
-            y.ReadStreamEventsBackwardAsync(streamId, startEvent, count,
+            y.ReadStreamEventsBackwardAsync(streamId, startEvent |> int64, count,
                                             (match resolveLinks with ResolveLinks r -> r),
                                             userCredentials)
 
           member x.SetStreamMetadata (streamId, expectedVersion, metadata, userCredentials) =
             match expectedVersion with
             | ExpectedVersion expectedVersion ->
-              y.SetStreamMetadataAsync(streamId, expectedVersion, metadata, userCredentials)
+              y.SetStreamMetadataAsync(streamId, expectedVersion |> int64, metadata, userCredentials)
 
           member x.SetStreamMetadataBytes(streamId, expectedVersion, metadata, userCredentials) =
             match expectedVersion with
             | ExpectedVersion expectedVersion ->
-              y.SetStreamMetadataAsync(streamId, expectedVersion, metadata, userCredentials)
+              y.SetStreamMetadataAsync(streamId, expectedVersion |> int64, metadata, userCredentials)
 
           member x.SetSystemSettings(systemSettings, userCredentials) =
             y.SetSystemSettingsAsync(systemSettings, userCredentials)
@@ -495,7 +495,7 @@ module TypeExtensions =
           member x.StartTransaction (streamId, expectedVersion, userCredentials) =
             match expectedVersion with
             | ExpectedVersion expectedVersion ->
-              y.StartTransactionAsync(streamId, expectedVersion, userCredentials)
+              y.StartTransactionAsync(streamId, expectedVersion |> int64, userCredentials)
             
           member x.SubscribeToAll (resolveLinks, eventAppeared, subscriptionDropped,
                                         userCredentials) =
@@ -504,11 +504,11 @@ module TypeExtensions =
                                   Option.noneIsNull subscriptionDropped,
                                   userCredentials)
 
-          member x.SubscribeToAllFrom (fromPos, resolveLinks, eventAppeared,
+          member x.SubscribeToAllFrom (fromPos, msettings, eventAppeared,
                                        liveProcessingStarted, subscriptionDropped, userCredentials) =
-            let resolveLinks = match resolveLinks with ResolveLinks r -> r
+            let settings = match msettings with Some r -> r | None -> CatchUpSubscriptionSettings.Default
             y.SubscribeToAllFrom(Option.toNullable fromPos,
-                                 resolveLinks, eventAppeared,
+                                 settings, eventAppeared,
                                  Option.noneIsNull liveProcessingStarted,
                                  Option.noneIsNull subscriptionDropped,
                                  userCredentials)
@@ -519,17 +519,17 @@ module TypeExtensions =
                                      Option.noneIsNull subscriptionDropped,
                                      userCredentials)
 
-          member x.SubscribeToStreamFrom (streamId, lastCheckpoint, resolveLinks,
+          member x.SubscribeToStreamFrom (streamId, lastCheckpoint, msettings,
                                           eventAppeared, liveProcessingStarted,
                                           subscriptionDropped, userCredentials) =
             let lastCheckpoint =
               match lastCheckpoint with
-              | StreamStart -> EventStore.ClientAPI.StreamCheckpoint.StreamStart
-              | StreamEventNumber n -> Nullable<int> (int n)
-            let resolveLinks = match resolveLinks with ResolveLinks r -> r
+              | StreamStart -> EventStore.ClientAPI.StreamCheckpoint.StreamStart |> Option.ofNullable |> Option.map int64 |> Option.toNullable
+              | StreamEventNumber n -> Nullable<Int64> (int64 n)
+            let settings = match msettings with Some r -> r | None -> CatchUpSubscriptionSettings.Default
             y.SubscribeToStreamFrom(streamId,
                                     lastCheckpoint,
-                                    resolveLinks, eventAppeared,
+                                    settings, eventAppeared,
                                     Option.noneIsNull liveProcessingStarted,
                                     Option.noneIsNull subscriptionDropped,
                                     userCredentials)
@@ -580,7 +580,26 @@ module Types =
 
   type EventData with
     static member Empty = EventStore.ClientAPI.EventData.Empty |> wrapEventData
-
+  // CATCHUPSUBSCRIPTIONSETTINGS
+  
+  type CatchUpSubscriptionSettings =
+    {MaxLiveQueureSize : int;
+     ReadBatchSize : int;
+     VerboseLogging : bool;
+     ResolveLinkTos : bool
+     }
+  let unwrapCatchUpSubscriptionSettings (s:CatchUpSubscriptionSettings) =
+    EventStore.ClientAPI.CatchUpSubscriptionSettings(s.MaxLiveQueureSize, s.ReadBatchSize, s.VerboseLogging, s.ResolveLinkTos)
+    
+  let wrapCatchUpSubscriptionSettings (s : EventStore.ClientAPI.CatchUpSubscriptionSettings) =
+    {MaxLiveQueureSize = s.MaxLiveQueueSize;
+     ReadBatchSize = s.ReadBatchSize;
+     VerboseLogging = s.VerboseLogging;
+     ResolveLinkTos = s.ResolveLinkTos
+     }
+  type CatchUpSubscriptionSettings with
+    static member Default = new EventStore.ClientAPI.CatchUpSubscriptionSettings(10000, 500, false, true) |> wrapCatchUpSubscriptionSettings
+    
   // RECORDED EVENT
 
   let private ctorRecordedEvent, private setterRecE = reflPkgFor<EventStore.ClientAPI.RecordedEvent> ()
@@ -744,7 +763,7 @@ module Types =
   let wrapEventReadResult (e : EventStore.ClientAPI.EventReadResult) =
     { Status      = e.Status
       Stream      = e.Stream
-      EventNumber = e.EventNumber
+      EventNumber = e.EventNumber |> int
       Event       = e.Event |> Option.fromNullable |> Option.map wrapResolvedEvent }
 
   type EventReadResult with

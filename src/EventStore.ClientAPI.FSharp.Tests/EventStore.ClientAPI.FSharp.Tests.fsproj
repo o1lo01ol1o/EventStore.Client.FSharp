@@ -71,53 +71,8 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="EventStore.BufferManagement">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.BufferManagement.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.ClientAPI.Embedded">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.ClientAPI.Embedded.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
         <Reference Include="EventStore.ClientAPI">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.ClientAPI.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.Common">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.Common.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.Core">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.Core.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.Projections.Core">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.Projections.Core.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.Rags">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.Rags.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.Transport.Http">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.Transport.Http.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="EventStore.Transport.Tcp">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\EventStore.Transport.Tcp.dll</HintPath>
-          <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="HdrHistogram.NET">
-          <HintPath>..\..\packages\EventStore.Client.Embedded.PreRelease\lib\net45\HdrHistogram.NET.dll</HintPath>
+          <HintPath>..\..\packages\EventStore.Client\lib\net40\EventStore.ClientAPI.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -127,8 +82,8 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
-        <Reference Include="EventStore.ClientAPI">
-          <HintPath>..\..\packages\EventStore.Client.PreRelease\lib\net45\EventStore.ClientAPI.dll</HintPath>
+        <Reference Include="EventStore.ClientAPI.Embedded">
+          <HintPath>..\..\packages\EventStore.Client.Embedded\lib\net40\EventStore.ClientAPI.Embedded.dll</HintPath>
           <Private>True</Private>
           <Paket>True</Paket>
         </Reference>
@@ -226,12 +181,12 @@
   <Choose>
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And $(TargetFrameworkVersion) == 'v4.5'">
       <ItemGroup>
+        <Reference Include="System.Xml">
+          <Paket>True</Paket>
+        </Reference>
         <Reference Include="NodaTime">
           <HintPath>..\..\packages\NodaTime\lib\net35-Client\NodaTime.dll</HintPath>
           <Private>True</Private>
-          <Paket>True</Paket>
-        </Reference>
-        <Reference Include="System.Xml">
           <Paket>True</Paket>
         </Reference>
       </ItemGroup>
@@ -259,4 +214,5 @@
       </ItemGroup>
     </When>
   </Choose>
+  <Import Project="..\..\packages\EventStore.Client.Embedded\build\EventStore.Client.Embedded.targets" Condition="Exists('..\..\packages\EventStore.Client.Embedded\build\EventStore.Client.Embedded.targets')" Label="Paket" />
 </Project>

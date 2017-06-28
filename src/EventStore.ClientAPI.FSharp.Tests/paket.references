@@ -3,5 +3,5 @@ protobuf-net
 NLog
 Logary
 Logary.Adapters.EventStore
-EventStore.Client.PreRelease
-EventStore.Client.Embedded.PreRelease
+EventStore.Client
+EventStore.Client.Embedded
