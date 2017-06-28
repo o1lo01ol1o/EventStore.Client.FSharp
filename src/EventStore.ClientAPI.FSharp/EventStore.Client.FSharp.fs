@@ -228,13 +228,13 @@ and Connection =
 
   abstract ConnectPersistentSubscription : StreamId
                                             * GroupName
-                                            * Action<EventStorePersistentSubscription, ResolvedEvent>
+                                            * Action<EventStorePersistentSubscriptionBase, ResolvedEvent>
                                             // subscriptionDropped:
-                                            * Action<EventStorePersistentSubscription, SubscriptionDropReason, exn> option
+                                            * Action<EventStorePersistentSubscriptionBase, SubscriptionDropReason, exn> option
                                             * SystemData.UserCredentials
                                             * Count
                                             * bool
-                                            -> EventStorePersistentSubscription
+                                            -> EventStorePersistentSubscriptionBase
 
   /// https://github.com/EventStore/EventStore/blob/ES-NET-v2.0.1/src/EventStore/EventStore.ClientAPI/IEventStoreConnection.cs#L242
   abstract ContinueTransaction           : TransactionId
