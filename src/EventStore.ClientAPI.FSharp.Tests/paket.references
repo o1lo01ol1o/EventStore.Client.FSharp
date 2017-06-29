@@ -1,7 +1,0 @@
-Fuchu
-protobuf-net
-NLog
-Logary
-Logary.Adapters.EventStore
-EventStore.Client
-EventStore.Client.Embedded
