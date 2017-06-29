@@ -2,11 +2,10 @@ framework = net45
 source https://www.nuget.org/api/v2
 
 nuget Chiron
-nuget EventStore.Client.Embedded.PreRelease
-nuget EventStore.Client.PreRelease
+nuget EventStore.Client.Embedded
+nuget EventStore.Client
 nuget FSharp.Core
 nuget Fuchu
-nuget Logary.Adapters.EventStore ~> 3.0.3
 nuget NuGet.CommandLine
 nuget protobuf-net
 nuget NLog
