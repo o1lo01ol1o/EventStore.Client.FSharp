@@ -19,10 +19,14 @@ module AsyncHelpers =
       elif t.IsCanceled then tcs.SetCanceled ()
       else tcs.SetResult(())), TaskContinuationOptions.ExecuteSynchronously)
     |> ignore
-    tcs.Task |> Async.AwaitTask |> rewrapAsyncExn
+    t |> Async.AwaitTask // |> rewrapAsyncExn
 
-  type Microsoft.FSharp.Control.Async with
-    static member AwaitTask t = awaitTask t
+  let flattenExns (e : AggregateException) = e.Flatten().InnerExceptions |> Seq.item 0
+  let rewrapAsyncExn (it : Async<'a>) =
+      async { try return! it with :? AggregateException as ae -> return! (Async.Raise <| flattenExns ae) }
+  //type Microsoft.FSharp.Control.Async with
+  //  static member AwaitTask t = 
+    
 
 [<AutoOpen>]
 module Primitives =
@@ -48,7 +52,7 @@ module Primitives =
     /// To be used when you don't have an empty stream nor when you have no stream,
     /// i.e. to be used when you have previously saved events to the stream and hence
     /// know its version.
-    | Specific of uint32
+    | Specific of uint64
     /// Use this if you create the stream when you start appending to it.
     | NoStream
     /// Use this for streams that have been created explicitly
@@ -67,13 +71,13 @@ module Primitives =
   type StreamCheckpoint =
     | StreamStart
     /// Exclusive event number to subscribe from. I.e. you will not receive this event.
-    | StreamEventNumber of uint32
+    | StreamEventNumber of uint64
 
 module internal Helpers =
 
-  let validUint (b : uint32) =
-    if b > uint32(System.Int32.MaxValue) then
-      failwithf "too large start %A, gt int32 max val" b
+  let validUint (b : uint64) =
+    if b > uint64(System.Int64.MaxValue) then
+      failwithf "too large start %A, gt int64 max val" b
     else int b
 
   let action  f = new System.Action<_>(f)
@@ -180,9 +184,9 @@ open System
 open System.Net
 open System.Threading.Tasks
 
-type Count = uint32
+type Count = uint64
 type Offset =
-    | Specific of uint32
+    | Specific of uint64
     | LastInStream
 type StreamId = string
 type GroupName = string
@@ -555,7 +559,7 @@ module Types =
 
   // EVENT DATA
 
-  let private emptyEventData = EventData(Guid.Empty, "", true, Empty.ByteArray, Empty.ByteArray)
+  let private emptyEventData = EventData(Guid.Empty, "Untyped", true, Empty.ByteArray, Empty.ByteArray)
 
   type EventStore.ClientAPI.EventData with
     static member Empty = emptyEventData
@@ -630,7 +634,7 @@ module Types =
       Type     : string
       Metadata : byte array
       Data     : byte array
-      Number   : uint32
+      Number   : uint64
       IsJson   : bool }
     override x.ToString() =
       sprintf "%A" x
@@ -656,7 +660,7 @@ module Types =
       Type     = e.EventType
       Metadata = e.Metadata
       Data     = e.Data
-      Number   = e.EventNumber |> uint32
+      Number   = e.EventNumber |> uint64
       IsJson   = e.IsJson }
 
   type RecordedEvent with
@@ -827,10 +831,10 @@ module Types =
   and Slice =
     { Events          : ResolvedEvent list
       Stream          : StreamId
-      FromEventNumber : uint32
+      FromEventNumber : uint64
       ReadDirection   : ReadDirection
-      NextEventNumber : uint32
-      LastEventNumber : uint32 }
+      NextEventNumber : uint64
+      LastEventNumber : uint64 }
   and StreamId = string
 
   let unwrapStreamEventsSlice =
@@ -857,10 +861,10 @@ module Types =
     | _ as s ->
       let data = { Events          = s.Events |> List.ofArray |> List.map wrapResolvedEvent
                  ; Stream          = s.Stream
-                 ; FromEventNumber = uint32(s.FromEventNumber)
+                 ; FromEventNumber = uint64(s.FromEventNumber)
                  ; ReadDirection   = s.ReadDirection |> wrapReadDirection
-                 ; NextEventNumber = uint32(s.NextEventNumber)
-                 ; LastEventNumber = uint32(s.LastEventNumber) }
+                 ; NextEventNumber = uint64(s.NextEventNumber)
+                 ; LastEventNumber = uint64(s.LastEventNumber) }
       Success <| (if s.IsEndOfStream then EndOfStream else StreamSlice) data
 
   type StreamEventsSlice with
@@ -940,7 +944,8 @@ module Conn =
                          expectedVersion credentials
                          (eventData : EventStore.ClientAPI.EventData list) =
     c.AppendToStream(streamId, expectedVersion, credentials, eventData)
-    |> awaitTask
+    |> Async.AwaitTask
+    |> AsyncHelpers.rewrapAsyncExn
     |> canThrowWrongExpectedVersion
 
   /// <summary><para>
@@ -1025,7 +1030,7 @@ module Conn =
                   liveProcessingStarted // EventStoreCatchUpSubscription -> unit
                   subscriptionDropped
                   userCredentials =
-    c.SubscribeToStreamFrom(streamId, streamCheckpoint, resolveLinks,
+    c.SubscribeToStreamFrom(streamId, streamCheckpoint, resolveLinks |> Option.map unwrapCatchUpSubscriptionSettings,
                             eventAppeared |> functor2 Types.wrapResolvedEvent |> action2,
                             liveProcessingStarted |> Option.map action,
                             subscriptionDropped |> Option.map action3,
@@ -1052,7 +1057,7 @@ module Conn =
   /// SubscribeToAllFrom
   let catchUpAllFrom (c : Connection) fromPos resolveLinks eventAppeared
     liveProcessingStarted subscriptionDropped userCredentials =
-    c.SubscribeToAllFrom(fromPos, resolveLinks,
+    c.SubscribeToAllFrom(fromPos, resolveLinks |> Option.map unwrapCatchUpSubscriptionSettings,
                          eventAppeared |> functor2 Types.wrapResolvedEvent |> action2,
                          liveProcessingStarted |> Option.map action,
                          subscriptionDropped |> Option.map action3,
